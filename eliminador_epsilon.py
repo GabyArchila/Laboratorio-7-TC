@@ -23,14 +23,10 @@ class Gramatica:
             self.simbolo_inicial = no_terminal
 
     def mostrar(self, titulo="Gramática"):
-        print(f"\n ------- {titulo} --------")
+        print(f"\n=== {titulo} ===")
         for nt in sorted(self.producciones.keys()):
             cuerpos = " | ".join(self.producciones[nt])
             print(f"{nt} → {cuerpos}")
-
-        print(f"No-terminales: {sorted(self.no_terminales)}")
-        print(f"Terminales: {sorted(self.terminales)}")
-        print(f"Símbolo inicial: {self.simbolo_inicial}")
 
 
 class EliminadorEpsilon:
@@ -39,10 +35,25 @@ class EliminadorEpsilon:
         self.anulables = set()
         self.nueva_gramatica = Gramatica()
         self.nueva_gramatica.simbolo_inicial = gramatica.simbolo_inicial
+        # Guardar qué símbolos producen epsilon DIRECTAMENTE
+        self.epsilon_directos = set()
 
     def eliminar_producciones_epsilon(self):
-        print("------------ Eliminación de Producciones ε ------------")
+        print("\n" + "=" * 50)
+        print(" Eliminación de producciones ε")
+        print("=" * 50)
+
         self.gramatica_original.mostrar("Gramática Original")
+
+        # Mostrar estadísticas iniciales
+        total_prod = sum(len(cuerpos) for cuerpos in self.gramatica_original.producciones.values())
+        prod_epsilon = sum(1 for cuerpos in self.gramatica_original.producciones.values()
+                           for cuerpo in cuerpos if cuerpo == 'ε')
+
+        print(f"\nEstadísticas iniciales:")
+        print(f"  Total de producciones: {total_prod}")
+        print(f"  Producciones-ε: {prod_epsilon}")
+
         self.encontrar_anulables()
         self.generar_nuevas_producciones()
         self.limpiar_epsilon()
@@ -50,113 +61,151 @@ class EliminadorEpsilon:
         return self.nueva_gramatica
 
     def encontrar_anulables(self):
+        print(f"\n--- PASO 1: Encontrar símbolos anulables ---")
 
-        print("\n--- PASO 1: Encontrar símbolos anulables ---")
+        # Paso 1: Encontrar símbolos que producen ε directamente
         for nt, cuerpos in self.gramatica_original.producciones.items():
             if 'ε' in cuerpos:
                 self.anulables.add(nt)
-                print(f"'{nt}' es anulable (produce ε directamente)")
+                self.epsilon_directos.add(nt)
+                print(f"  {nt} → ε (anulable directo)")
 
+        print(f"Anulables directos: {sorted(self.anulables)}")
+
+        # Paso 2: Encontrar símbolos anulables indirectamente
         cambio = True
         iteracion = 1
 
         while cambio:
-            print(f"\nIteración {iteracion}:")
             cambio = False
-            anulables_antes = self.anulables.copy()
+            anulables_antes = len(self.anulables)
+            nuevos_anulables = set()
+
+            print(f"\nIteración {iteracion}:")
 
             for nt, cuerpos in self.gramatica_original.producciones.items():
                 if nt not in self.anulables:
                     for cuerpo in cuerpos:
                         if cuerpo != 'ε' and self.es_cadena_anulable(cuerpo):
-                            self.anulables.add(nt)
-                            cambio = True
-                            print(f"  '{nt}' es anulable (produce '{cuerpo}' que es anulable)")
+                            nuevos_anulables.add(nt)
+                            print(f"  {nt} es anulable (produce '{cuerpo}' que es anulable)")
                             break
 
-            if not cambio:
+            # Agregar los nuevos anulables
+            if nuevos_anulables:
+                self.anulables.update(nuevos_anulables)
+                cambio = True
+                print(f"  Nuevos anulables en iteración {iteracion}: {sorted(nuevos_anulables)}")
+            else:
                 print(f"  No hay nuevos símbolos anulables")
 
             iteracion += 1
 
-        print(f"\nSímbolos anulables finales: {sorted(self.anulables)}")
+            # Prevenir bucles infinitos
+            if iteracion > 10:
+                print("  ⚠️  Deteniendo después de 10 iteraciones")
+                break
+
+        print(f"\n✓ Símbolos anulables finales: {sorted(self.anulables)}")
+        print(f"✓ Símbolos con ε directo: {sorted(self.epsilon_directos)}")
 
     def es_cadena_anulable(self, cadena):
         if cadena == 'ε':
             return True
-
         return all(simbolo in self.anulables for simbolo in cadena)
 
     def generar_nuevas_producciones(self):
+        print(f"\n--- PASO 2: Generar nuevas producciones ---")
 
-        print("\n--- PASO 2: Generar Nuevas Producciones ---")
+        total_nuevas = 0
 
         for nt, cuerpos in self.gramatica_original.producciones.items():
-            print(f"\nProcesando producciones de {nt}:")
-
+            print(f"\nProcesando {nt}:")
             nuevos_cuerpos = set()
 
-            for cuerpo in cuerpos:
-                print(f"  Analizando: {nt} → {cuerpo}")
+            for i, cuerpo in enumerate(cuerpos):
+                print(f"  Producción {i + 1}: {nt} → {cuerpo}")
 
                 if cuerpo == 'ε':
-                    print(f"    Saltando producción ε")
+                    nuevos_cuerpos.add('ε')
+                    print(f"    Manteniendo ε temporalmente")
                     continue
 
+                # Encontrar posiciones de símbolos anulables
                 posiciones_anulables = []
-                for i, simbolo in enumerate(cuerpo):
+                for j, simbolo in enumerate(cuerpo):
                     if simbolo in self.anulables:
-                        posiciones_anulables.append(i)
-
-                print(f"    Símbolos anulables en posiciones: {posiciones_anulables}")
+                        posiciones_anulables.append(j)
 
                 if not posiciones_anulables:
                     nuevos_cuerpos.add(cuerpo)
-                    print(f"    Sin cambios: {cuerpo}")
+                    print(f"    Sin símbolos anulables: '{cuerpo}'")
                 else:
                     num_anulables = len(posiciones_anulables)
-                    print(f"    Generando 2^{num_anulables} = {2 ** num_anulables} combinaciones")
+                    print(f"    Símbolos anulables en posiciones {posiciones_anulables}")
+                    print(f"    Generando 2^{num_anulables} = {2 ** num_anulables} combinaciones:")
 
+                    # Generar todas las combinaciones
+                    combinaciones_generadas = 0
                     for r in range(num_anulables + 1):
                         for combo in combinations(posiciones_anulables, r):
                             nuevo_cuerpo = ""
-                            for i, simbolo in enumerate(cuerpo):
-                                if i not in combo:
+                            for k, simbolo in enumerate(cuerpo):
+                                if k not in combo:
                                     nuevo_cuerpo += simbolo
 
                             if nuevo_cuerpo == "":
                                 nuevo_cuerpo = "ε"
 
                             nuevos_cuerpos.add(nuevo_cuerpo)
-                            print(f"      Eliminando posiciones {combo}: '{nuevo_cuerpo}'")
+                            combinaciones_generadas += 1
 
+                            if combo:
+                                eliminados = [f"{cuerpo[p]}" for p in combo]
+                                print(f"      Eliminando {eliminados}: '{nuevo_cuerpo}'")
+                            else:
+                                print(f"      Sin eliminaciones: '{nuevo_cuerpo}'")
+
+                    print(f"    Total combinaciones generadas: {combinaciones_generadas}")
+
+            # Agregar todas las nuevas producciones
             for nuevo_cuerpo in nuevos_cuerpos:
                 self.nueva_gramatica.agregar_produccion(nt, nuevo_cuerpo)
+                total_nuevas += 1
 
+            print(f"  Total producciones para {nt}: {len(nuevos_cuerpos)}")
+
+        print(f"\n✓ Total de producciones generadas: {total_nuevas}")
         self.nueva_gramatica.mostrar("Gramática con Nuevas Producciones")
 
     def limpiar_epsilon(self):
-
-        print("\n--- PASO 3: Limpiar Producciones ε ---")
+        print(f"\n--- PASO 3: Limpiar producciones ε ---")
 
         gramatica_limpia = Gramatica()
         gramatica_limpia.simbolo_inicial = self.nueva_gramatica.simbolo_inicial
 
         epsilon_removidas = 0
+        epsilon_mantenidas = 0
 
         for nt, cuerpos in self.nueva_gramatica.producciones.items():
             for cuerpo in cuerpos:
                 if cuerpo == 'ε':
-                    if nt == self.nueva_gramatica.simbolo_inicial and nt in self.anulables:
+                    # Solo mantener ε si es el símbolo inicial Y produce ε directamente
+                    if (nt == self.nueva_gramatica.simbolo_inicial and
+                            nt in self.epsilon_directos):
                         gramatica_limpia.agregar_produccion(nt, cuerpo)
-                        print(f"Manteniendo {nt} → ε (símbolo inicial anulable)")
+                        epsilon_mantenidas += 1
+                        print(f"  Manteniendo {nt} → ε (símbolo inicial con ε directo)")
                     else:
                         epsilon_removidas += 1
-                        print(f"Removiendo {nt} → ε")
+                        print(f"  Removiendo {nt} → ε")
                 else:
                     gramatica_limpia.agregar_produccion(nt, cuerpo)
 
-        print(f"\nTotal de producciones ε removidas: {epsilon_removidas}")
+        print(f"\nResultado de limpieza:")
+        print(f"  Producciones ε removidas: {epsilon_removidas}")
+        if epsilon_mantenidas > 0:
+            print(f"  Producciones ε mantenidas: {epsilon_mantenidas}")
 
         self.nueva_gramatica = gramatica_limpia
         self.nueva_gramatica.mostrar("Gramática Final Sin ε-Producciones")
@@ -170,7 +219,7 @@ def cargar_gramatica_desde_archivo(nombre_archivo):
 
     gramatica = Gramatica()
 
-    print(f"\nCargando gramática desde: {nombre_archivo}")
+    print(f"Cargando gramática desde: {nombre_archivo}")
 
     with open(nombre_archivo, 'r', encoding='utf-8') as archivo:
         for linea_num, linea in enumerate(archivo, 1):
@@ -196,7 +245,7 @@ def cargar_gramatica_desde_archivo(nombre_archivo):
                     # Agregar cada cuerpo como producción separada
                     for cuerpo in cuerpos:
                         gramatica.agregar_produccion(no_terminal, cuerpo)
-                        print(f"  Agregada: {no_terminal} → {cuerpo}")
+                        print(f"  Línea {linea_num}: {no_terminal} → {cuerpo}")
                 else:
                     print(f"  Error en línea {linea_num}: formato incorrecto")
             else:
