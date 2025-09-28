@@ -1,7 +1,6 @@
 import re
 import sys
 import os
-
 from preprocesamiento import infix_to_postfix
 from thompson import Thompson
 from subconjuntos import Subconjuntos
@@ -9,27 +8,8 @@ from subconjuntos import Subconjuntos
 
 class ValidadorGramaticas:
     def __init__(self):
-        self.regex_produccion = r'^[A-Z]\s*→\s*(ε|([A-Za-z0-9]+(\s*\|\s*[A-Za-z0-9]+)*))$'
+        self.regex_produccion = r'^[A-Z]\s*→\s*(ε|([A-Za-z0-9]+(\s*\|\s*([A-Za-z0-9]+|ε))*))$'
         self.patron = re.compile(self.regex_produccion)
-        self.construir_automata_validacion()
-
-    def construir_automata_validacion(self):
-
-        print("Construyendo autómata para validación usando Proyecto 1...")
-        regex_simple = "[A-Z]→[A-Za-z0-9|]*"
-
-        try:
-            postfix = infix_to_postfix(regex_simple)
-            thompson = Thompson()
-            afn = thompson.construir_desde_postfix(postfix)
-            subconjuntos = Subconjuntos(afn)
-            self.afd_validador = subconjuntos.convertir()
-
-            print("Autómata de validación construido exitosamente")
-
-        except Exception as e:
-            print(f"Error construyendo autómata: {e}")
-            self.afd_validador = None
 
     def validar_linea(self, linea):
         linea = linea.strip()
@@ -40,14 +20,11 @@ class ValidadorGramaticas:
         print(f"Validando línea: '{linea}'")
 
         if self.patron.match(linea):
-            print("✓ Validación con regex: VÁLIDA")
-            linea_sin_espacios = linea.replace(' ', '')
-            print(f"  Línea sin espacios: '{linea_sin_espacios}'")
+            print("Validación con regex: VÁLIDA")
             self.analizar_produccion(linea)
-
             return True, "Producción válida"
         else:
-            print("✗ Validación con regex: INVÁLIDA")
+            print("Validación con regex: INVÁLIDA")
             return False, "Formato de producción inválido"
 
     def analizar_produccion(self, linea):
@@ -64,8 +41,14 @@ class ValidadorGramaticas:
         if '|' in cuerpo:
             alternativas = [alt.strip() for alt in cuerpo.split('|')]
             print(f"  Alternativas: {alternativas}")
+
+            # Verificar si hay epsilon en las alternativas
+            if 'ε' in alternativas:
+                print(f"   Contiene producción-ε")
         else:
             print(f"  Producción única: {cuerpo}")
+            if cuerpo == 'ε':
+                print(f" Es una producción-ε")
 
     def validar_archivo(self, nombre_archivo):
         if not os.path.exists(nombre_archivo):
@@ -102,4 +85,5 @@ class ValidadorGramaticas:
             for num, prod in producciones_validas:
                 print(f"  Línea {num}: {prod}")
 
+        return len(errores) == 0, errores
         return len(errores) == 0, errores
