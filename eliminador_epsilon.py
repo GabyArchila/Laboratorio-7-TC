@@ -72,7 +72,6 @@ class EliminadorEpsilon:
 
         print(f"Anulables directos: {sorted(self.anulables)}")
 
-        # Paso 2: Encontrar símbolos anulables indirectamente
         cambio = True
         iteracion = 1
 
@@ -90,8 +89,6 @@ class EliminadorEpsilon:
                             nuevos_anulables.add(nt)
                             print(f"  {nt} es anulable (produce '{cuerpo}' que es anulable)")
                             break
-
-            # Agregar los nuevos anulables
             if nuevos_anulables:
                 self.anulables.update(nuevos_anulables)
                 cambio = True
@@ -101,13 +98,12 @@ class EliminadorEpsilon:
 
             iteracion += 1
 
-            # Prevenir bucles infinitos
             if iteracion > 10:
-                print("  ⚠️  Deteniendo después de 10 iteraciones")
+                print("   Deteniendo después de 10 iteraciones")
                 break
 
-        print(f"\n✓ Símbolos anulables finales: {sorted(self.anulables)}")
-        print(f"✓ Símbolos con ε directo: {sorted(self.epsilon_directos)}")
+        print(f"\nSímbolos anulables finales: {sorted(self.anulables)}")
+        print(f"Símbolos con ε directo: {sorted(self.epsilon_directos)}")
 
     def es_cadena_anulable(self, cadena):
         if cadena == 'ε':
@@ -145,7 +141,6 @@ class EliminadorEpsilon:
                     print(f"    Símbolos anulables en posiciones {posiciones_anulables}")
                     print(f"    Generando 2^{num_anulables} = {2 ** num_anulables} combinaciones:")
 
-                    # Generar todas las combinaciones
                     combinaciones_generadas = 0
                     for r in range(num_anulables + 1):
                         for combo in combinations(posiciones_anulables, r):
@@ -168,7 +163,6 @@ class EliminadorEpsilon:
 
                     print(f"    Total combinaciones generadas: {combinaciones_generadas}")
 
-            # Agregar todas las nuevas producciones
             for nuevo_cuerpo in nuevos_cuerpos:
                 self.nueva_gramatica.agregar_produccion(nt, nuevo_cuerpo)
                 total_nuevas += 1
@@ -190,7 +184,6 @@ class EliminadorEpsilon:
         for nt, cuerpos in self.nueva_gramatica.producciones.items():
             for cuerpo in cuerpos:
                 if cuerpo == 'ε':
-                    # Solo mantener ε si es el símbolo inicial Y produce ε directamente
                     if (nt == self.nueva_gramatica.simbolo_inicial and
                             nt in self.epsilon_directos):
                         gramatica_limpia.agregar_produccion(nt, cuerpo)
@@ -225,24 +218,20 @@ def cargar_gramatica_desde_archivo(nombre_archivo):
         for linea_num, linea in enumerate(archivo, 1):
             linea = linea.strip()
 
-            # Saltar líneas vacías y comentarios
             if not linea or linea.startswith('#'):
                 continue
 
-            # Parsear producción
             if '→' in linea:
                 partes = linea.split('→')
                 if len(partes) == 2:
                     no_terminal = partes[0].strip()
                     cuerpo_completo = partes[1].strip()
 
-                    # Manejar alternativas (|)
                     if '|' in cuerpo_completo:
                         cuerpos = [c.strip() for c in cuerpo_completo.split('|')]
                     else:
                         cuerpos = [cuerpo_completo]
 
-                    # Agregar cada cuerpo como producción separada
                     for cuerpo in cuerpos:
                         gramatica.agregar_produccion(no_terminal, cuerpo)
                         print(f"  Línea {linea_num}: {no_terminal} → {cuerpo}")
